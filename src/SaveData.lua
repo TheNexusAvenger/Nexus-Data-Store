@@ -349,7 +349,7 @@ function SaveData:OnUpdate(Key,Callback)
     end
 
     --Connect the event.
-    self.OnUpdateEvents[Key].Event:Connect(Callback)
+    return self.OnUpdateEvents[Key].Event:Connect(Callback)
 end
 
 --[[
