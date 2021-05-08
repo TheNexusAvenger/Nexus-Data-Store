@@ -36,7 +36,7 @@ Initializes the data and connections.
 --]]
 function SaveData:Initialize()
     self.Connected = true
-    self.AutoSaveDelay = 5
+    self.AutoSaveDelay = 10
     self.AllowOverwriteOfFailedLoad = false
     self.SendDataChangeUpdates = true
     self.DataLoadSuccessful = false
