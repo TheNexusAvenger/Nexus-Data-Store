@@ -52,7 +52,10 @@ function SaveDataTest:Setup()
             if not Object then
                 self:AssertEquals(Object,nil,"Last message is incorrect.")
             else
-                self:AssertEquals(HttpService:JSONEncode(Object),self.MockMessagingService.LastMessage,"Last message is incorrect.")
+                local ActualObject = HttpService:JSONDecode(self.MockMessagingService.LastMessage)
+                self:AssertNotNil(ActualObject.SyncId,"Sync id not populated.")
+                ActualObject.SyncId = nil
+                self:AssertEquals(Object,ActualObject,"Last message is incorrect.")
             end
         end,
     }

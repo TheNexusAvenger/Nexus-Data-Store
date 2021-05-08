@@ -44,6 +44,7 @@ function SaveData:Initialize()
     self.PendingUpdates = {}
     self.KeysPendingFetchUpdates = {}
     self.OnUpdateEvents = {}
+    self.SyncId = HttpService:GenerateGUID()
 
     --Connect the messaging service.
     local Worked,ErrorMessage = pcall(function()
@@ -173,7 +174,7 @@ function SaveData:HandleRemoteChange(Object)
         return
     end
 
-    if Object.Action then
+    if Object.Action and Object.SyncId ~= self.SyncId then
         if Object.Action == "Fetch" then
             --Fetch data that was too long to send.
             local Worked,ErrorMessage = pcall(function()
@@ -263,7 +264,7 @@ function SaveData:Flush()
     --Invoke the update message.
     if #self.KeysPendingFetchUpdates > 0 then
         local Worked,ErrorMessage = pcall(function()
-            self:PublishChange({Action="Fetch",Keys=self.KeysPendingFetchUpdates})
+            self:PublishChange({Action="Fetch",Keys=self.KeysPendingFetchUpdates,SyncId=self.SyncId})
             self.KeysPendingFetchUpdates = {}
         end)
         if not Worked then
@@ -287,7 +288,7 @@ function SaveData:Set(Key,Value)
     self:InternalSet(Key,Value)
 
     --Invoke the change object.
-    local ActionObject = {Action="Set",Key=Key,Value=Value}
+    local ActionObject = {Action="Set",Key=Key,Value=Value,SyncId=self.SyncId}
     if self:CanSendObject(ActionObject) then
         self:PublishChangeBackground(ActionObject)
     else
