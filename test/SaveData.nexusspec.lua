@@ -63,6 +63,8 @@ function SaveDataTest:Setup()
     --Create the components under testing.
     self.CuT1 = SaveData.new("TestDataStore","TestKey",self.MockDataStoreService,self.MockMessagingService)
     self.CuT2 = SaveData.new("TestDataStore","TestKey",self.MockDataStoreService,self.MockMessagingService)
+    self.CuT1.MessagingServiceBufferTime = 0
+    self.CuT2.MessagingServiceBufferTime = 0
 end
 
 --[[
@@ -276,6 +278,60 @@ NexusUnitTesting:RegisterUnitTest(SaveDataTest.new("PublishAsyncErrors"):SetRun(
     self.CuT1:Flush()
     self.MockDataStore:AssertSave({Test1=string.rep("Test",500)})
     self.MockMessagingService:AssertLastMessage({Action="Fetch",Keys={"Test1"}})
+end))
+
+--[[
+Tests MessagingService buffering for write-heavy cases.
+--]]
+NexusUnitTesting:RegisterUnitTest(SaveDataTest.new("MessagingServiceBufferTime"):SetRun(function(self)
+    --Set the messaging service buffer time for the test (setup overrides to 0 for other tests).
+    self.CuT1.MessagingServiceBufferTime = 0.2
+
+    --Write a value and assert it was instantly set.
+    self.CuT1:Set("Test1",0)
+    self:AssertEquals(self.CuT1:Get("Test1"),0,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),0,"Value wasn't replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test1",Value=0})
+
+    --Write 100 values and assert they weren't sent due to the buffer time.
+    wait(0.1)
+    for i = 1,100 do
+        self.CuT1:Set("Test1",i)
+    end
+    self:AssertEquals(self.CuT1:Get("Test1"),100,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),0,"Value was replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test1",Value=0})
+
+    --Write a different value and assert it was sent.
+    self.CuT1:Set("Test2",1)
+    self:AssertEquals(self.CuT1:Get("Test1"),100,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),0,"Value was replicated.")
+    self:AssertEquals(self.CuT1:Get("Test2"),1,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test2"),1,"Value wasn't replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test2",Value=1})
+
+    --Wait the buffer time to clear and assert value was updated.
+    wait(0.15)
+    self:AssertEquals(self.CuT1:Get("Test1"),100,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),100,"Value wasn't replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test1",Value=100})
+
+    --Write the value again and assert the buffer time is used.
+    self.CuT1:Set("Test1",101)
+    self:AssertEquals(self.CuT1:Get("Test1"),101,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),100,"Value was replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test1",Value=100})
+    wait(0.25)
+    self:AssertEquals(self.CuT1:Get("Test1"),101,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),101,"Value wasn't replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test1",Value=101})
+
+    --Assert a new value after the buffer time is replicated.
+    wait(0.25)
+    self.CuT1:Set("Test1",102)
+    self:AssertEquals(self.CuT1:Get("Test1"),102,"Value wasn't set.")
+    self:AssertEquals(self.CuT2:Get("Test1"),102,"Value wasn't replicated.")
+    self.MockMessagingService:AssertLastMessage({Action="Set",Key="Test1",Value=102})
 end))
 
 

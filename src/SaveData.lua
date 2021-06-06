@@ -37,6 +37,7 @@ Initializes the data and connections.
 function SaveData:Initialize()
     self.Connected = true
     self.AutoSaveDelay = 10
+    self.MessagingServiceBufferTime = 10
     self.AllowOverwriteOfFailedLoad = false
     self.SendDataChangeUpdates = true
     self.DataLoadSuccessful = false
@@ -45,6 +46,8 @@ function SaveData:Initialize()
     self.KeysPendingFetchUpdates = {}
     self.OnUpdateEvents = {}
     self.SyncId = HttpService:GenerateGUID()
+    self.LastKeyUpdateMessageTimes = {}
+    self.QueuedKeyUpdateMessages = {}
 
     --Connect the messaging service.
     local Worked,ErrorMessage = pcall(function()
@@ -141,7 +144,21 @@ function SaveData:PublishChangeBackground(Object)
     if self.SendDataChangeUpdates then
         coroutine.wrap(function()
             local Worked,ErrorMessage = pcall(function()
-                self:PublishChange(Object)
+                local Key = Object.Key
+                if Object.Action == "Set" and Key and self.MessagingServiceBufferTime > 0 then
+                    if not self.LastKeyUpdateMessageTimes[Key] or tick() - self.LastKeyUpdateMessageTimes[Key] >= self.MessagingServiceBufferTime then
+                        self.LastKeyUpdateMessageTimes[Key] = tick()
+                        self:PublishChange(Object)
+                    elseif not self.QueuedKeyUpdateMessages[Object.Key] then
+                        self.QueuedKeyUpdateMessages[Key] = true
+                        delay(self.MessagingServiceBufferTime - (tick() - self.LastKeyUpdateMessageTimes[Key]),function()
+                            self.QueuedKeyUpdateMessages[Key] = nil
+                            self:PublishChangeBackground({Action="Set",Key=Key,Value=self:Get(Key),SyncId=self.SyncId})
+                        end)
+                    end
+                else
+                    self:PublishChange(Object)
+                end
             end)
             if not Worked then
                 warn("Failed to publish change for "..self.MessagingServiceKey.." because "..tostring(ErrorMessage))
