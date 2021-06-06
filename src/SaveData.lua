@@ -122,10 +122,15 @@ function SaveData:DataLoadedSuccessfully()
 end
 
 --[[
-Returns if an object is too long to send.
+Returns if an object is below the limit of sending
+through the messaging service.
 --]]
 function SaveData:CanSendObject(Object)
-    return string.len(HttpService:JSONEncode(HttpService:JSONEncode(Object))) <= 850
+    --This looks weird because the limit is by data, not by message length.
+    --1 JSONEncode is required to convert the message to a string, then another
+    --JSONEncode is required for the BulkMessagingService. The last JSONEncode
+    --seems to be done internally for escaping characters.
+    return string.len(HttpService:JSONEncode(HttpService:JSONEncode(HttpService:JSONEncode(Object)))) <= 800
 end
 
 --[[
