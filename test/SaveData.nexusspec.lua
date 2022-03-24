@@ -281,6 +281,38 @@ NexusUnitTesting:RegisterUnitTest(SaveDataTest.new("PublishAsyncErrors"):SetRun(
 end))
 
 --[[
+Tests nil values when updating.
+--]]
+NexusUnitTesting:RegisterUnitTest(SaveDataTest.new("UpdateNilValues"):SetRun(function(self)
+    --Set initial values.
+    self.CuT1:Set("Test1", "Value1")
+    self.CuT1:Set("Test2", "Value2")
+    self.CuT1:Flush()
+    self.MockDataStore:AssertSave({Test1="Value1", Test2="Value2"})
+
+    --Update so that the second key is nil.
+    self.CuT1:Update({"Test1", "Test2"}, function(Value1, Value2)
+        self:AssertEquals("Value1", Value1)
+        self:AssertEquals("Value2", Value2)
+        return "Value3", nil
+    end)
+    self.MockDataStore:AssertSave({Test1="Value3"})
+
+    --Update so that the first key is nil.
+    self.CuT1:Update({"Test1", "Test2"}, function(Value1, Value2)
+        self:AssertEquals("Value3", Value1)
+        self:AssertEquals(nil, Value2)
+        return nil, "Value4"
+    end)
+    self.MockDataStore:AssertSave({Test2="Value4"})
+
+    --Set a key to nil.
+    self.CuT1:Set("Test2", nil)
+    self.CuT1:Flush()
+    self.MockDataStore:AssertSave({})
+end))
+
+--[[
 Tests MessagingService buffering for write-heavy cases.
 --]]
 NexusUnitTesting:RegisterUnitTest(SaveDataTest.new("MessagingServiceBufferTime"):SetRun(function(self)

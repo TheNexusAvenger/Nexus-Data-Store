@@ -253,7 +253,7 @@ function SaveData:Flush()
             --Invoke the update methods.
             for _,PendingUpdate in pairs(self.PendingUpdates) do
                 local Keys,UpdateFunction = PendingUpdate.Keys,PendingUpdate.UpdateFunction
-            
+
                 --Get the values of the keys.
                 local Values = {}
                 for i,Key in pairs(Keys) do
@@ -261,12 +261,11 @@ function SaveData:Flush()
                 end
 
                 --Update the values.
-                for i,Value in pairs({UpdateFunction(unpack(Values))}) do
-                    local Key = Keys[i]
-                    if Key then
-                        self:InternalSet(Key,Value)
-                        OldData[Key] = Value
-                    end
+                local NewValues = table.pack(UpdateFunction(table.unpack(Values)))
+                for i, Key in pairs(Keys) do
+                    local Value = NewValues[i]
+                    self:InternalSet(Key, Value)
+                    OldData[Key] = Value
                 end
             end
 
