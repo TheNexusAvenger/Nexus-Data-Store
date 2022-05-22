@@ -1,0 +1,15 @@
+{
+    "name": "Nexus-Data-Store",
+    "tree": {
+        "$className": "DataModel",
+        "ServerScriptService": {
+            "$className": "ServerScriptService",
+            "NexusDataStore": {
+                "$path": "."
+            },
+            "NexusDataStoreTests": {
+                "$path": "./test"
+            }
+        }
+    }
+}
