@@ -24,6 +24,13 @@ NexusDataStore.MessagingService:StartPassiveLoop()
 
 export type SaveData = SaveData.SaveData
 
+export type NexusDataStore = {
+    GetDataStore: (self: NexusDataStore, DataStoreName: string, Key: string) -> (SaveData),
+    GetSaveDataById: (self: NexusDataStore, UserId: number) -> (SaveData),
+    GetSaveData: (self: NexusDataStore, PlayerOrId: Player | number) -> (SaveData),
+    RemoveFromCache: (self: NexusDataStore, DataStoreName: Player | number | string, Key: string?) -> (),
+}
+
 
 
 --[[
@@ -154,4 +161,4 @@ end)
 
 
 
-return NexusDataStore
+return (NexusDataStore :: any) :: NexusDataStore
