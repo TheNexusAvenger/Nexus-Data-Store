@@ -11,8 +11,7 @@ SaveData.__index = SaveData
 local HttpService = game:GetService("HttpService")
 
 export type SaveData = {
-    new: (DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService) -> (SaveData),
-    StartBackgroundFlushing: (self: SaveData) -> (),
+    new: (DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService) -> (SaveDataInternal),
     SetSendDataChangeUpdates: (self: SaveData, Value: boolean) -> (),
     SetAllowOverwriteOfFailedLoad: (self: SaveData, Value: boolean) -> (),
     DataLoadedSuccessfully: (self: SaveData) -> (boolean),
@@ -22,15 +21,18 @@ export type SaveData = {
     Increment: (self: SaveData, Key: string, Value: number) -> (),
     Update: <T...>(self: SaveData, Keys: string | {string}, UpdateFunction: (T...) -> (T...)) -> (),
     OnUpdate: (self: SaveData, Key: string, Callback: (any) -> ()) -> RBXScriptConnection,
-    Disconnect: (self: SaveData) -> (),
 }
 
+export type SaveDataInternal = SaveData & {
+    StartBackgroundFlushing: (self: SaveData) -> (),
+    Disconnect: (self: SaveData) -> (),
+}
 
 
 --[[
 Creates the save data instance.
 --]]
-function SaveData.new(DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService): SaveData
+function SaveData.new(DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService): SaveDataInternal
     --Create the object.
     local SaveDataObject = {}
     setmetatable(SaveDataObject, SaveData)
@@ -44,7 +46,7 @@ function SaveData.new(DataStoreName: string, Key: string, DataStoreService: Data
     SaveDataObject:Initialize()
 
     --Return the object.
-    return (SaveDataObject :: any) :: SaveData
+    return (SaveDataObject :: any) :: SaveDataInternal
 end
 
 --[[
@@ -71,7 +73,7 @@ function SaveData:Initialize(): ()
             self:HandleRemoteChange(HttpService:JSONDecode(Message.Data))
         end)
     end, function(ErrorMessage: string): ()
-        warn("Failed to subscribe to changes for "..self.MessagingServiceKey.." because "..tostring(ErrorMessage))
+        warn("Failed to subscribe to changes for "..tostring(self.MessagingServiceKey).." because "..tostring(ErrorMessage))
     end)
 
     --Get the DataStore.
@@ -79,7 +81,7 @@ function SaveData:Initialize(): ()
         return self.DataStoreService:GetDataStore(self.DataStoreName)
     end)
     if not Worked then
-        error("Failed to get DataStore for "..self.DataStoreName.." because "..tostring(DataStore))
+        error("Failed to get DataStore for "..tostring(self.DataStoreName).." because "..tostring(DataStore))
         return
     end
     self.DataStore = DataStore
@@ -89,7 +91,7 @@ function SaveData:Initialize(): ()
         self.Data = DataStore:GetAsync(self.DataStoreKey) or {}
         self.DataLoadSuccessful = true
     end, function(ErrorMessage: string): ()
-        warn("Failed to get data from "..self.DataStoreName.." -> "..self.DataStoreKey.." because "..tostring(ErrorMessage))
+        warn("Failed to get data from "..tostring(self.DataStoreName).." -> "..tostring(self.DataStoreKey).." because "..tostring(ErrorMessage))
     end)
 end
 
@@ -218,7 +220,7 @@ function SaveData:HandleRemoteChange(Object: any): ()
                     self:InternalSet(Key, NewData[Key])
                 end
             end, function(ErrorMessage: string): ()
-                warn("Failed to fetch changes from "..self.DataStoreName.." -> "..self.DataStoreKey.." because "..tostring(ErrorMessage))
+                warn("Failed to fetch changes from "..tostring(self.DataStoreName).." -> "..tostring(self.DataStoreKey).." because "..tostring(ErrorMessage))
             end)
         elseif Object.Action == "Set" then
             --Set the value.

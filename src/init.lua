@@ -16,7 +16,7 @@ local SaveData = require(script:WaitForChild("SaveData"))
 local BulkMessagingService = require(script:WaitForChild("BulkMessagingService"))
 
 local NexusDataStore = {}
-NexusDataStore.SaveDataCache = {} :: {[string]: {[string]: SaveData}}
+NexusDataStore.SaveDataCache = {} :: {[string]: {[string]: SaveData.SaveDataInternal}}
 NexusDataStore.SaveDataCacheEvents = {}
 NexusDataStore.DataStoreService = game:GetService("DataStoreService")
 NexusDataStore.MessagingService = BulkMessagingService.new(game:GetService("MessagingService")) :: (MessagingService & {StartPassiveLoop: (any) -> ()})
@@ -41,7 +41,7 @@ function NexusDataStore:GetDataStore(DataStoreName: string, Key: string): SaveDa
     end
 
     --Return the cached entry.
-    return self.SaveDataCache[DataStoreName][Key]
+    return self.SaveDataCache[DataStoreName][Key] :: SaveData
 end
 
 --[[
@@ -49,7 +49,7 @@ Returns the SavaData structure for
 a given user id.
 --]]
 function NexusDataStore:GetSaveDataById(UserId: number): SaveData
-    return self:GetDataStore(PLAYERDATASTORE_DATA_STORE, PLAYERDATASTORE_ID_PREFIX..tostring(UserId))
+    return self:GetDataStore(PLAYERDATASTORE_DATA_STORE, PLAYERDATASTORE_ID_PREFIX..tostring(UserId)) :: SaveData
 end
 
 --[[
@@ -83,7 +83,7 @@ function NexusDataStore:GetSaveData(PlayerOrId: Player | number): SaveData
     end
 
     --Return the save data.
-    return SaveData
+    return SaveData :: SaveData
 end
 
 --[[
