@@ -4,6 +4,7 @@ TheNexusAvenger
 Sends messages in bulk through 1 topic to prevent
 too many topics being used.
 --]]
+--!strict
 
 local BulkMessagingService = {}
 BulkMessagingService.__index = BulkMessagingService
@@ -15,10 +16,10 @@ local HttpService = game:GetService("HttpService")
 --[[
 Creates a bulk messaging service.
 --]]
-function BulkMessagingService.new(MessagingService)
+function BulkMessagingService.new(MessagingService: MessagingService): MessagingService
     --Create the object.
     local BulkMessagingServiceObject = {}
-    setmetatable(BulkMessagingServiceObject,BulkMessagingService)
+    setmetatable(BulkMessagingServiceObject, BulkMessagingService)
 
     --Set up the properties.
     BulkMessagingServiceObject.Topic = "NexusBulkMessagingService"
@@ -28,47 +29,45 @@ function BulkMessagingService.new(MessagingService)
     BulkMessagingServiceObject.PendingFlush = false
 
     --Set up subscribing.
-    local Worked,ErrorMessage = pcall(function()
-        MessagingService:SubscribeAsync(BulkMessagingServiceObject.Topic,function(MessageData)
-            for Topic,Packets in pairs(HttpService:JSONDecode(MessageData.Data)) do
+    xpcall(function()
+        MessagingService:SubscribeAsync(BulkMessagingServiceObject.Topic, function(MessageData)
+            for Topic, Packets in HttpService:JSONDecode(MessageData.Data) do
                 local Event = BulkMessagingServiceObject.SubscribedEvents[Topic]
                 if Event then
-                    for _,Packet in pairs(Packets) do
-                        Event:Fire({Data=Packet,Sent=MessageData.Sent})
+                    for _,Packet in Packets do
+                        Event:Fire({Data = Packet, Sent = MessageData.Sent})
                     end
                 end
             end
         end)
-    end)
-    if not Worked then
+    end, function(ErrorMessage: string)
         warn("Listening to messaging service failed because "..tostring(ErrorMessage))
-    end
+    end)
 
     --Return the object.
-    return BulkMessagingServiceObject
+    return (BulkMessagingServiceObject :: any) :: MessagingService
 end
 
 --[[
 Starts the passive loop for flushing messages.
 --]]
-function BulkMessagingService:StartPassiveLoop()
-    coroutine.wrap(function()
+function BulkMessagingService:StartPassiveLoop(): ()
+    task.spawn(function()
         while true do
-            local Worked,ErrorMessage = pcall(function()
+            xpcall(function()
                 self:FlushMessages()
-            end)
-            if not Worked then
+            end, function(ErrorMessage: string)
                 warn("Passive flush failed because "..tostring(ErrorMessage))
-            end
-            wait(1)
+            end)
+            task.wait(1)
         end
-    end)()
+    end)
 end
 
 --[[
 Returns if an object is too long to send.
 --]]
-function BulkMessagingService:CanSendObject(Object)
+function BulkMessagingService:CanSendObject(Object: any): boolean
     return string.len(HttpService:JSONEncode(HttpService:JSONEncode(Object))) <= 800
 end
 
@@ -76,12 +75,12 @@ end
 Clones the pending messages and adds the new message.
 Returns the clone of the data.
 --]]
-function BulkMessagingService:AddPacket(Topic,Message)
+function BulkMessagingService:AddPacket(Topic: string, Message: any): {[string]: {any}}
     --Clone the pending messages.
     local PendingMessages = {}
-    for Topic,Packets in pairs(self.PendingMessages) do
+    for Topic, Packets in self.PendingMessages do
         PendingMessages[Topic] = {}
-        for i,Packet in pairs(Packets) do
+        for i, Packet in Packets do
             PendingMessages[Topic][i] = Packet
         end
     end
@@ -90,7 +89,7 @@ function BulkMessagingService:AddPacket(Topic,Message)
     if not PendingMessages[Topic] then
         PendingMessages[Topic] = {}
     end
-    table.insert(PendingMessages[Topic],Message)
+    table.insert(PendingMessages[Topic], Message)
 
     --Return the messages.
     return PendingMessages
@@ -111,7 +110,7 @@ end
 --[[
 Publishes a message for a given topic.
 --]]
-function BulkMessagingService:PublishAsync(Topic,Message)
+function BulkMessagingService:PublishAsync(Topic: string, Message: any): ()
     --Flush if the new message would make the packet too big.
     if not BulkMessagingService:CanSendObject(self:AddPacket(Topic,Message)) then
         self:FlushMessages()
@@ -128,7 +127,7 @@ end
 --[[
 Subscribes to messages being sent for a topic.
 --]]
-function BulkMessagingService:SubscribeAsync(Topic,Callback)
+function BulkMessagingService:SubscribeAsync(Topic: string, Callback: (any) -> ()): RBXScriptConnection
     --Create the event.
     if not self.SubscribedEvents[Topic] then
         self.SubscribedEvents[Topic] = Instance.new("BindableEvent")
@@ -140,4 +139,6 @@ end
 
 
 
-return BulkMessagingService
+return (BulkMessagingService :: any) :: MessagingService & {
+    new: (MessagingService: MessagingService) -> MessagingService,
+}
