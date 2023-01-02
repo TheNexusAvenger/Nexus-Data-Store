@@ -20,7 +20,7 @@ export type SaveData = {
     Get: (self: SaveData, Key: string) -> (any),
     Set: (self: SaveData, Key: string, Value: any) -> (),
     Increment: (self: SaveData, Key: string, Value: number) -> (),
-    Update: (self: SaveData, Keys: string | {string}, UpdateFunction: (any) -> (any)) -> (),
+    Update: <T...>(self: SaveData, Keys: string | {string}, UpdateFunction: (T...) -> (T...)) -> (),
     OnUpdate: (self: SaveData, Key: string, Callback: (any) -> ()) -> RBXScriptConnection,
     Disconnect: (self: SaveData) -> (),
 }
@@ -348,7 +348,7 @@ or keys. If multiple keys are given, the update function
 will pass the old values and expect the new values to be returned.
 This is intended for important updates that need to happen together.
 --]]
-function SaveData:Update(Keys: string | {string}, UpdateFunction: (any) -> (any))
+function SaveData:Update<T...>(Keys: string | {string}, UpdateFunction: (T...) -> (T...))
     --Convert the key to a table.
     if type(Keys) == "string" then
         Keys = {Keys}
