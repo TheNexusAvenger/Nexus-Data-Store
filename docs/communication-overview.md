@@ -12,7 +12,7 @@ a special strucutre to function. All keys are assumed to be strings, but values 
 be any type supported by data stores.
 
 Messages are sent between servers either containing the new value that was set using
-`SaveData:Set(Key,Value)` or `SaveData:Increment(Key,Value)` if the message is short enough.
+`SaveData:Set(Key, Value)` or `SaveData:Increment(Key, Value)` if the message is short enough.
 If it isn't, it is marked as a key that needs to be fetched by the other servers.
 After a successful `UpdateAsync` while flushing, a message is sent to the other servers
 of the keys to fetch and update.
