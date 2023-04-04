@@ -18,6 +18,8 @@ local BulkMessagingService = require(script:WaitForChild("BulkMessagingService")
 local NexusDataStore = {}
 NexusDataStore.SaveDataCache = {} :: {[string]: {[string]: SaveData.SaveDataInternal}}
 NexusDataStore.SaveDataCacheEvents = {}
+NexusDataStore.SaveDataLoading = {}
+NexusDataStore.SaveDataLoadedEvent = Instance.new("BindableEvent")
 NexusDataStore.DataStoreService = game:GetService("DataStoreService")
 NexusDataStore.MessagingService = BulkMessagingService.new(game:GetService("MessagingService")) :: (MessagingService & {StartPassiveLoop: (any) -> ()})
 NexusDataStore.MessagingService:StartPassiveLoop()
@@ -41,10 +43,17 @@ function NexusDataStore:GetDataStore(DataStoreName: string, Key: string): SaveDa
     --Add the cache entry if it doesn't exist.
     if not self.SaveDataCache[DataStoreName] then
         self.SaveDataCache[DataStoreName] = {}
+        self.SaveDataLoading[DataStoreName] = {}
+    end
+    while self.SaveDataLoading[DataStoreName][Key] do
+        self.SaveDataLoadedEvent.Event:Wait()
     end
     if not self.SaveDataCache[DataStoreName][Key] then
+        self.SaveDataLoading[DataStoreName][Key] = true
         self.SaveDataCache[DataStoreName][Key] = SaveData.new(DataStoreName, Key, self.DataStoreService, self.MessagingService)
         self.SaveDataCache[DataStoreName][Key]:StartBackgroundFlushing()
+        self.SaveDataLoading[DataStoreName][Key] = nil
+        self.SaveDataLoadedEvent:Fire()
     end
 
     --Return the cached entry.
