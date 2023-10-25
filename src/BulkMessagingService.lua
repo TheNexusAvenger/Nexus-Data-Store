@@ -6,6 +6,8 @@ too many topics being used.
 --]]
 --!strict
 
+local NOT_CONNECTED_WARNING_DELAY_SECONDS = 10
+
 local BulkMessagingService = {}
 BulkMessagingService.__index = BulkMessagingService
 
@@ -29,19 +31,27 @@ function BulkMessagingService.new(MessagingService: MessagingService): Messaging
     BulkMessagingServiceObject.PendingFlush = false
 
     --Set up subscribing.
-    xpcall(function()
-        MessagingService:SubscribeAsync(BulkMessagingServiceObject.Topic, function(MessageData)
-            for Topic, Packets in HttpService:JSONDecode(MessageData.Data) do
-                local Event = BulkMessagingServiceObject.SubscribedEvents[Topic]
-                if Event then
-                    for _,Packet in Packets do
-                        Event:Fire({Data = Packet, Sent = MessageData.Sent})
+    local SubscribeAsyncComplete = false
+    task.spawn(function()
+        xpcall(function()
+            MessagingService:SubscribeAsync(BulkMessagingServiceObject.Topic, function(MessageData)
+                for Topic, Packets in HttpService:JSONDecode(MessageData.Data) do
+                    local Event = BulkMessagingServiceObject.SubscribedEvents[Topic]
+                    if Event then
+                        for _,Packet in Packets do
+                            Event:Fire({Data = Packet, Sent = MessageData.Sent})
+                        end
                     end
                 end
-            end
+            end)
+        end, function(ErrorMessage: string)
+            warn("Listening to messaging service failed because "..tostring(ErrorMessage))
         end)
-    end, function(ErrorMessage: string)
-        warn("Listening to messaging service failed because "..tostring(ErrorMessage))
+        SubscribeAsyncComplete = true
+    end)
+    task.delay(NOT_CONNECTED_WARNING_DELAY_SECONDS, function()
+        if SubscribeAsyncComplete then return end
+        warn("MessagingService::SubscribeAsync failed to complete in "..tostring(NOT_CONNECTED_WARNING_DELAY_SECONDS).." seconds. Messages may not be received.")
     end)
 
     --Return the object.
