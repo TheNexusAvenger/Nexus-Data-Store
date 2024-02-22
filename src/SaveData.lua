@@ -245,7 +245,7 @@ to true, no data will be flushed to prevent overwriting data.
 function SaveData:Flush(): ()
     --Return if there is no data to change.
     if #self.PendingUpdates == 0 and #self.KeysPendingFetchUpdates == 0 then
-        return
+        --TODO: return
     end
 
     --Warn if the data can't be saved.
@@ -317,6 +317,11 @@ end
 Sets the stored value for a given key.
 --]]
 function SaveData:Set(Key: string, Value: any): ()
+    --Ignore the set if the value is the same.
+    if Value == self:Get(Key) then
+        return
+    end
+
     --Set the value.
     self:InternalSet(Key, Value)
 

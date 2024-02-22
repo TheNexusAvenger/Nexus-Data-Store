@@ -222,6 +222,15 @@ return function()
             MockDataStore:AssertSave({})
         end)
 
+        it("should not send changes when there are no changes.", function()
+            SaveData1.Data.Test1 = 0
+
+            --Write a value and assert it was instantly set.
+            SaveData1:Set("Test1", 0)
+            expect(SaveData1:Get("Test1")).to.equal(0)
+            MockMessagingService:AssertLastMessage(nil)
+        end)
+
         it("should buffer write-heavy cases.", function()
             --Set the messaging service buffer time for the test (setup overrides to 0 for other tests).
             SaveData1.MessagingServiceBufferTime = 0.2
