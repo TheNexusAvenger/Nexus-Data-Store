@@ -245,7 +245,7 @@ to true, no data will be flushed to prevent overwriting data.
 function SaveData:Flush(): ()
     --Return if there is no data to change.
     if #self.PendingUpdates == 0 and #self.KeysPendingFetchUpdates == 0 then
-        --TODO: return
+        return
     end
 
     --Warn if the data can't be saved.
