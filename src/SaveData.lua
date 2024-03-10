@@ -10,8 +10,7 @@ SaveData.__index = SaveData
 
 local HttpService = game:GetService("HttpService")
 
-export type SaveData = {
-    new: (DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService) -> (SaveDataInternal),
+export type BaseSaveData = {
     SetSendDataChangeUpdates: (self: SaveData, Value: boolean) -> (),
     SetAllowOverwriteOfFailedLoad: (self: SaveData, Value: boolean) -> (),
     DataLoadedSuccessfully: (self: SaveData) -> (boolean),
@@ -22,6 +21,10 @@ export type SaveData = {
     Update: <T...>(self: SaveData, Keys: string | {string}, UpdateFunction: (T...) -> (T...)) -> (),
     OnUpdate: (self: SaveData, Key: string, Callback: (any) -> ()) -> RBXScriptConnection,
 }
+
+export type SaveData = {
+    new: (DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService) -> (SaveDataInternal),
+} & BaseSaveData
 
 export type SaveDataInternal = SaveData & {
     StartBackgroundFlushing: (self: SaveData) -> (),
@@ -346,7 +349,7 @@ end
 Increments the stored value for a given key.
 --]]
 function SaveData:Increment(Key: string, Value: number): ()
-    self:Set(Key,(self.Data[Key] or 0) + Value)
+    self:Set(Key, (self.Data[Key] or 0) + Value)
 end
 
 --[[
@@ -363,7 +366,7 @@ function SaveData:Update<T...>(Keys: string | {string}, UpdateFunction: (T...) -
 
     --Add the keys to fetch.
     for _, Key in Keys :: {string} do
-        table.insert(self.KeysPendingFetchUpdates,Key)
+        table.insert(self.KeysPendingFetchUpdates, Key)
     end
 
     --Add the update function.
