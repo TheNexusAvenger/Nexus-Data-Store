@@ -227,8 +227,22 @@ return function()
 
             --Write a value and assert it was instantly set.
             SaveData1:Set("Test1", 0)
+            SaveData1:Flush()
             expect(SaveData1:Get("Test1")).to.equal(0)
             MockMessagingService:AssertLastMessage(nil)
+            MockDataStore:AssertSave(nil)
+        end)
+
+        it("should always send changes when a table is passed", function()
+            local TestData = {}
+            SaveData1.Data.Test1 = TestData
+
+            --Write a value and assert it was instantly set.
+            SaveData1:Set("Test1", TestData)
+            SaveData1:Flush()
+            expect(SaveData1:Get("Test1")).to.equal(TestData)
+            MockMessagingService:AssertLastMessage(nil)
+            MockDataStore:AssertSave({Test1 = {}})
         end)
 
         it("should buffer write-heavy cases.", function()

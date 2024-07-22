@@ -321,7 +321,7 @@ Sets the stored value for a given key.
 --]]
 function SaveData:Set(Key: string, Value: any): ()
     --Ignore the set if the value is the same.
-    if Value == self:Get(Key) then
+    if Value == self:Get(Key) and typeof(Value) ~= "table" then
         return
     end
 
