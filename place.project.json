@@ -6,7 +6,10 @@
             "$className": "ServerScriptService",
             "NexusDataStore": {
                 "$path": "."
-            },
+            }
+        },
+        "TestService": {
+            "$className": "TestService",
             "NexusDataStoreTests": {
                 "$path": "./test"
             }
