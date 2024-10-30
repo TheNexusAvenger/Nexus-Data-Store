@@ -1,8 +1,4 @@
---[[
-TheNexusAvenger
-
-Tests the LocalSaveData class.
---]]
+--Tests the LocalSaveData class.
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -70,6 +66,18 @@ return function()
             expect(TestLocalSaveData:Get("TestKey2")).to.equal(nil)
             expect(TestLocalSaveData:Get("TestKey3")).to.equal(4)
             expect(TestLocalSaveData:Get("TestKey4")).to.equal(6)
+        end)
+
+        it("should list multiple keys.", function()
+            TestLocalSaveData:Set("TestKey1", 1)
+            TestLocalSaveData:Set("TestKey2", 2)
+            TestLocalSaveData:Set("TestKey4", 4)
+
+            local Keys = TestLocalSaveData:ListKeys()
+            expect(#Keys).to.equal(3)
+            expect(table.find(Keys, "TestKey1") ~= nil).to.equal(true)
+            expect(table.find(Keys, "TestKey2") ~= nil).to.equal(true)
+            expect(table.find(Keys, "TestKey4") ~= nil).to.equal(true)
         end)
 
         it("should fire OnUpdate events for new values.", function()

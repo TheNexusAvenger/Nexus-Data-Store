@@ -310,6 +310,17 @@ function SaveData.Flush(self: SaveData): ()
 end
 
 --[[
+Lists the keys in the save data.
+--]]
+function SaveData.ListKeys(self: SaveData): {string}
+    local Keys = {}
+    for Key, _ in self.Data do
+        table.insert(Keys, Key)
+    end
+    return Keys
+end
+
+--[[
 Returns the stored value for a given key.
 --]]
 function SaveData.Get(self: SaveData, Key: string): any

@@ -229,7 +229,7 @@ return function()
             MockDataStore:AssertSave(nil)
         end)
 
-        it("should always send changes when a table is passed", function()
+        it("should always send changes when a table is passed.", function()
             local TestData = {}
             SaveData1.Data.Test1 = TestData
 
@@ -239,6 +239,18 @@ return function()
             expect(SaveData1:Get("Test1")).to.equal(TestData)
             MockMessagingService:AssertLastMessage(nil)
             MockDataStore:AssertSave({Test1 = {}})
+        end)
+
+        it("should list multiple keys.", function()
+            SaveData1:Set("TestKey1", 1)
+            SaveData1:Set("TestKey2", 2)
+            SaveData1:Set("TestKey4", 4)
+
+            local Keys = SaveData1:ListKeys()
+            expect(#Keys).to.equal(3)
+            expect(table.find(Keys, "TestKey1") ~= nil).to.equal(true)
+            expect(table.find(Keys, "TestKey2") ~= nil).to.equal(true)
+            expect(table.find(Keys, "TestKey4") ~= nil).to.equal(true)
         end)
 
         it("should buffer write-heavy cases.", function()

@@ -60,6 +60,17 @@ function LocalSaveData.Flush(self: LocalSaveData): ()
 end
 
 --[[
+Lists the keys in the save data.
+--]]
+function LocalSaveData.ListKeys(self: LocalSaveData): {string}
+    local Keys = {}
+    for Key, _ in self.Data do
+        table.insert(Keys, Key)
+    end
+    return Keys
+end
+
+--[[
 Returns the stored value for a given key.
 --]]
 function LocalSaveData.Get(self: LocalSaveData, Key: string): any
