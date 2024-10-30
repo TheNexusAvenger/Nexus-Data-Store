@@ -1,9 +1,4 @@
---[[
-TheNexusAvenger
-
-Sends messages in bulk through 1 topic to prevent
-too many topics being used.
---]]
+--Sends messages in bulk through 1 topic to prevent too many topics being used.
 --!strict
 
 local NOT_CONNECTED_WARNING_DELAY_SECONDS = 10
@@ -13,30 +8,36 @@ BulkMessagingService.__index = BulkMessagingService
 
 local HttpService = game:GetService("HttpService")
 
+export type BulkMessagingService = {
+    Topic: string,
+    MessagingService: MessagingService,
+    PendingMessages: {[string]: {any}},
+    SubscribedEvents: {[string]: BindableEvent},
+    PendingFlush: boolean,
+} & typeof(setmetatable({}, BulkMessagingService))
+
 
 
 --[[
 Creates a bulk messaging service.
 --]]
-function BulkMessagingService.new(MessagingService: MessagingService): MessagingService
+function BulkMessagingService.new(MessagingService: MessagingService): BulkMessagingService
     --Create the object.
-    local BulkMessagingServiceObject = {}
-    setmetatable(BulkMessagingServiceObject, BulkMessagingService)
-
-    --Set up the properties.
-    BulkMessagingServiceObject.Topic = "NexusBulkMessagingService"
-    BulkMessagingServiceObject.MessagingService = MessagingService
-    BulkMessagingServiceObject.PendingMessages = {}
-    BulkMessagingServiceObject.SubscribedEvents = {}
-    BulkMessagingServiceObject.PendingFlush = false
+    local self = setmetatable({
+        Topic = "NexusBulkMessagingService",
+        MessagingService = MessagingService,
+        PendingMessages = {},
+        SubscribedEvents = {},
+        PendingFlush = false,
+    }, BulkMessagingService) :: BulkMessagingService
 
     --Set up subscribing.
     local SubscribeAsyncComplete = false
     task.spawn(function()
         xpcall(function()
-            MessagingService:SubscribeAsync(BulkMessagingServiceObject.Topic, function(MessageData)
+            MessagingService:SubscribeAsync(self.Topic, function(MessageData)
                 for Topic, Packets in HttpService:JSONDecode(MessageData.Data) do
-                    local Event = BulkMessagingServiceObject.SubscribedEvents[Topic]
+                    local Event = self.SubscribedEvents[Topic]
                     if Event then
                         for _,Packet in Packets do
                             Event:Fire({Data = Packet, Sent = MessageData.Sent})
@@ -45,23 +46,23 @@ function BulkMessagingService.new(MessagingService: MessagingService): Messaging
                 end
             end)
         end, function(ErrorMessage: string)
-            warn("Listening to messaging service failed because "..tostring(ErrorMessage))
+            warn(`Listening to messaging service failed because {ErrorMessage}`)
         end)
         SubscribeAsyncComplete = true
     end)
     task.delay(NOT_CONNECTED_WARNING_DELAY_SECONDS, function()
         if SubscribeAsyncComplete then return end
-        warn("MessagingService::SubscribeAsync failed to complete in "..tostring(NOT_CONNECTED_WARNING_DELAY_SECONDS).." seconds. Messages may not be received.")
+        warn(`MessagingService::SubscribeAsync failed to complete in {NOT_CONNECTED_WARNING_DELAY_SECONDS} seconds. Messages may not be received.`)
     end)
 
     --Return the object.
-    return (BulkMessagingServiceObject :: any) :: MessagingService
+    return self
 end
 
 --[[
 Starts the passive loop for flushing messages.
 --]]
-function BulkMessagingService:StartPassiveLoop(): ()
+function BulkMessagingService.StartPassiveLoop(self: BulkMessagingService): ()
     task.spawn(function()
         while true do
             xpcall(function()
@@ -77,7 +78,7 @@ end
 --[[
 Returns if an object is too long to send.
 --]]
-function BulkMessagingService:CanSendObject(Object: any): boolean
+function BulkMessagingService.CanSendObject(self: BulkMessagingService, Object: any): boolean
     return string.len(HttpService:JSONEncode(HttpService:JSONEncode(Object))) <= 800
 end
 
@@ -85,7 +86,7 @@ end
 Clones the pending messages and adds the new message.
 Returns the clone of the data.
 --]]
-function BulkMessagingService:AddPacket(Topic: string, Message: any): {[string]: {any}}
+function BulkMessagingService.AddPacket(self: BulkMessagingService, Topic: string, Message: any): {[string]: {any}}
     --Clone the pending messages.
     local PendingMessages = {}
     for Topic, Packets in self.PendingMessages do
@@ -108,21 +109,21 @@ end
 --[[
 Flushes the current messages.
 --]]
-function BulkMessagingService:FlushMessages()
+function BulkMessagingService.FlushMessages(self: BulkMessagingService)
     if self.PendingFlush then
         local MessagesJSON = HttpService:JSONEncode(self.PendingMessages)
         self.PendingMessages = {}
         self.PendingFlush = false
-        self.MessagingService:PublishAsync(self.Topic,MessagesJSON)
+        self.MessagingService:PublishAsync(self.Topic, MessagesJSON)
     end
 end
 
 --[[
 Publishes a message for a given topic.
 --]]
-function BulkMessagingService:PublishAsync(Topic: string, Message: any): ()
+function BulkMessagingService.PublishAsync(self: BulkMessagingService, Topic: string, Message: any): ()
     --Flush if the new message would make the packet too big.
-    if not BulkMessagingService:CanSendObject(self:AddPacket(Topic,Message)) then
+    if not self:CanSendObject(self:AddPacket(Topic, Message)) then
         self:FlushMessages()
     end
 
@@ -130,14 +131,14 @@ function BulkMessagingService:PublishAsync(Topic: string, Message: any): ()
     if not self.PendingMessages[Topic] then
         self.PendingMessages[Topic] = {}
     end
-    table.insert(self.PendingMessages[Topic],Message)
+    table.insert(self.PendingMessages[Topic], Message)
     self.PendingFlush = true
 end
 
 --[[
 Subscribes to messages being sent for a topic.
 --]]
-function BulkMessagingService:SubscribeAsync(Topic: string, Callback: (any) -> ()): RBXScriptConnection
+function BulkMessagingService.SubscribeAsync(self: BulkMessagingService, Topic: string, Callback: (any) -> ()): RBXScriptConnection
     --Create the event.
     if not self.SubscribedEvents[Topic] then
         self.SubscribedEvents[Topic] = Instance.new("BindableEvent")
@@ -149,6 +150,4 @@ end
 
 
 
-return (BulkMessagingService :: any) :: MessagingService & {
-    new: (MessagingService: MessagingService) -> MessagingService,
-}
+return BulkMessagingService

@@ -1,6 +1,4 @@
 --[[
-TheNexusAvenger
-
 Main module for Nexus Data Store.
 Intended to be a replacement for Stravant's PlayerDataStore
 with the additions of cross-server updating.
@@ -16,22 +14,16 @@ local SaveData = require(script:WaitForChild("SaveData"))
 local BulkMessagingService = require(script:WaitForChild("BulkMessagingService"))
 
 local NexusDataStore = {}
-NexusDataStore.SaveDataCache = {} :: {[string]: {[string]: SaveData.SaveDataInternal}}
+NexusDataStore.SaveDataCache = {} :: {[string]: {[string]: SaveData.SaveData}}
 NexusDataStore.SaveDataCacheEvents = {}
 NexusDataStore.SaveDataLoading = {}
 NexusDataStore.SaveDataLoadedEvent = Instance.new("BindableEvent")
 NexusDataStore.DataStoreService = game:GetService("DataStoreService")
-NexusDataStore.MessagingService = BulkMessagingService.new(game:GetService("MessagingService")) :: (MessagingService & {StartPassiveLoop: (any) -> ()})
+NexusDataStore.MessagingService = BulkMessagingService.new(game:GetService("MessagingService"))
 NexusDataStore.MessagingService:StartPassiveLoop()
 
 export type SaveData = SaveData.SaveData
-
-export type NexusDataStore = {
-    GetDataStore: (self: NexusDataStore, DataStoreName: string, Key: string) -> (SaveData),
-    GetSaveDataById: (self: NexusDataStore, UserId: number) -> (SaveData),
-    GetSaveData: (self: NexusDataStore, PlayerOrId: Player | number) -> (SaveData),
-    RemoveFromCache: (self: NexusDataStore, DataStoreName: Player | number | string, Key: string?) -> (),
-}
+export type NexusDataStore = typeof(NexusDataStore)
 
 
 
@@ -39,7 +31,7 @@ export type NexusDataStore = {
 Returns the SavaData structure for
 a given DataStore key.
 --]]
-function NexusDataStore:GetDataStore(DataStoreName: string, Key: string): SaveData
+function NexusDataStore.GetDataStore(self: NexusDataStore, DataStoreName: string, Key: string): SaveData
     --Add the cache entry if it doesn't exist.
     if not self.SaveDataCache[DataStoreName] then
         self.SaveDataCache[DataStoreName] = {}
@@ -64,7 +56,7 @@ end
 Returns the SavaData structure for
 a given user id.
 --]]
-function NexusDataStore:GetSaveDataById(UserId: number): SaveData
+function NexusDataStore.GetSaveDataById(self: NexusDataStore, UserId: number): SaveData
     return self:GetDataStore(PLAYERDATASTORE_DATA_STORE, PLAYERDATASTORE_ID_PREFIX..tostring(UserId)) :: SaveData
 end
 
@@ -75,7 +67,7 @@ data when the player leaves, but does
 not remove the data from the cache in
 case it is still neded.
 --]]
-function NexusDataStore:GetSaveData(PlayerOrId: Player | number): SaveData
+function NexusDataStore.GetSaveData(self: NexusDataStore, PlayerOrId: Player | number): SaveData
     --Return the save data for an id.
     if typeof(PlayerOrId) == "number" then
         return self:GetSaveDataById(PlayerOrId :: number)
@@ -106,17 +98,17 @@ end
 Flushes all SaveData. Yields for all of
 them to finish flushing.
 --]]
-function NexusDataStore:FlushAll(): ()
+function NexusDataStore.FlushAll(self: NexusDataStore): ()
     --Start flushing all of the data.
     local SavesRemaining = 0
-    for _,DataStore in self.SaveDataCache do
-        for _,SaveData in DataStore do
+    for _, DataStore in self.SaveDataCache do
+        for _, SaveData in DataStore do
             SavesRemaining = SavesRemaining + 1
             task.spawn(function()
                 xpcall(function()
-                    SaveData:Flush()
+                    (SaveData :: SaveData.SaveData):Flush()
                 end, function(ErrorMessage: string): ()
-                    warn("Flush for "..SaveData.DataStoreName.." -> "..SaveData.DataStoreKey.." failed because "..tostring(ErrorMessage))
+                    warn(`Flush for {SaveData.DataStoreName} -> {SaveData.DataStoreKey} failed because {ErrorMessage}`)
                 end)
                 SavesRemaining = SavesRemaining - 1
             end)
@@ -136,7 +128,7 @@ the cache. If NexusDataStore:GetDataStore() or other
 SaveData fetcher methods are called, the cache entry
 is recreated.
 --]]
-function NexusDataStore:RemoveFromCache(DataStoreName: Player | number | string, Key: string?): ()
+function NexusDataStore.RemoveFromCache(self: NexusDataStore, DataStoreName: Player | number | string, Key: string?): ()
     --Determine the key.
     if typeof(DataStoreName) == "number" then
         DataStoreName = PLAYERDATASTORE_DATA_STORE
@@ -146,17 +138,19 @@ function NexusDataStore:RemoveFromCache(DataStoreName: Player | number | string,
         Key = PLAYERDATASTORE_ID_PREFIX..tostring(DataStoreName.UserId)
     end
 
-    if self.SaveDataCache[DataStoreName] and self.SaveDataCache[DataStoreName][Key] then
+    local StringDataStoreName = DataStoreName :: string
+    local StringKey = Key :: string
+    if self.SaveDataCache[StringDataStoreName] and self.SaveDataCache[StringDataStoreName][StringKey] then
         --Disconnect and remove the cached entry.
-        self.SaveDataCache[DataStoreName][Key]:Disconnect()
-        self.SaveDataCache[DataStoreName][Key] = nil
+        self.SaveDataCache[StringDataStoreName][StringKey]:Disconnect()
+        self.SaveDataCache[StringDataStoreName][StringKey] = nil
 
         --Disconnect the events.
-        if self.SaveDataCacheEvents[DataStoreName] and self.SaveDataCacheEvents[DataStoreName][Key] then
-            for _,Event in self.SaveDataCacheEvents[DataStoreName][Key] do
+        if self.SaveDataCacheEvents[StringDataStoreName] and self.SaveDataCacheEvents[StringDataStoreName][StringKey] then
+            for _,Event in self.SaveDataCacheEvents[StringDataStoreName][StringKey] do
                 Event:Disconnect()
             end
-            self.SaveDataCacheEvents[DataStoreName][Key] = nil
+            self.SaveDataCacheEvents[StringDataStoreName][StringKey] = nil
         end
     end
 end

@@ -1,8 +1,4 @@
---[[
-TheNexusAvenger
-
-Tests the SaveData class.
---]]
+--Tests the SaveData class.
 --!strict
 
 local HttpService = game:GetService("HttpService")

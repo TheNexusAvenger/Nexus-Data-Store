@@ -1,90 +1,90 @@
---[[
-TheNexusAvenger
-
-Handles saving data for a DataStore key.
---]]
+--Handles saving data for a DataStore key.
 --!strict
+
+local HttpService = game:GetService("HttpService")
+
+local BulkMessagingService = require(script.Parent:WaitForChild("BulkMessagingService"))
 
 local SaveData = {}
 SaveData.__index = SaveData
 
-local HttpService = game:GetService("HttpService")
-
-export type BaseSaveData = {
-    SetSendDataChangeUpdates: (self: SaveData, Value: boolean) -> (),
-    SetAllowOverwriteOfFailedLoad: (self: SaveData, Value: boolean) -> (),
-    DataLoadedSuccessfully: (self: SaveData) -> (boolean),
-    Flush: (self: SaveData) -> (),
-    Get: (self: SaveData, Key: string) -> (any),
-    Set: (self: SaveData, Key: string, Value: any) -> (),
-    Increment: (self: SaveData, Key: string, Value: number) -> (),
-    Update: <T...>(self: SaveData, Keys: string | {string}, UpdateFunction: (T...) -> (T...)) -> (),
-    OnUpdate: (self: SaveData, Key: string, Callback: (any) -> ()) -> RBXScriptConnection,
-}
-
 export type SaveData = {
-    new: (DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService) -> (SaveDataInternal),
-} & BaseSaveData
+    DataStoreName: string,
+    DataStoreKey: string,
+    MessagingServiceKey: string,
+    DataStoreService: DataStoreService,
+    MessagingService: BulkMessagingService.BulkMessagingService,
+    Connected: boolean,
+    AutoSaveDelay: number,
+    MessagingServiceBufferTime: number,
+    AllowOverwriteOfFailedLoad: boolean,
+    SendDataChangeUpdates: boolean,
+    DataLoadSuccessful: boolean,
+    Data: {[string]: any},
+    PendingUpdates: {{Keys: {string}, UpdateFunction: (any) -> (any)}},
+    KeysPendingFetchUpdates: {string},
+    OnUpdateEvents: {[string]: BindableEvent},
+    SyncId: string,
+    LastKeyUpdateMessageTimes: {[string]: number},
+    QueuedKeyUpdateMessages: {[string]: boolean},
+    DataStore: DataStore?,
+    MessagingServiceListenEvent: RBXScriptConnection?,
+} & typeof(setmetatable({},SaveData ))
 
-export type SaveDataInternal = SaveData & {
-    StartBackgroundFlushing: (self: SaveData) -> (),
-    Disconnect: (self: SaveData) -> (),
-}
 
 
 --[[
 Creates the save data instance.
 --]]
-function SaveData.new(DataStoreName: string, Key: string, DataStoreService: DataStoreService, MessagingService: MessagingService): SaveDataInternal
+function SaveData.new(DataStoreName: string, Key: string, DataStoreService: DataStoreService, BulkMessagingService: BulkMessagingService.BulkMessagingService): SaveData
     --Create the object.
-    local SaveDataObject = {}
-    setmetatable(SaveDataObject, SaveData)
+    local self = setmetatable({
+        DataStoreName = DataStoreName,
+        DataStoreKey = Key,
+        MessagingServiceKey = `NSD_{Key}`,
+        DataStoreService = DataStoreService,
+        MessagingService = BulkMessagingService,
+        Connected = true,
+        AutoSaveDelay = 10,
+        MessagingServiceBufferTime = 10,
+        AllowOverwriteOfFailedLoad = false,
+        SendDataChangeUpdates = true,
+        DataLoadSuccessful = false,
+        Data = {},
+        PendingUpdates = {},
+        KeysPendingFetchUpdates = {},
+        OnUpdateEvents = {},
+        SyncId = HttpService:GenerateGUID(),
+        LastKeyUpdateMessageTimes = {},
+        QueuedKeyUpdateMessages = {},
+    }, SaveData) :: SaveData
 
     --Initialize the data.
-    SaveDataObject.DataStoreName = DataStoreName
-    SaveDataObject.DataStoreKey = Key
-    SaveDataObject.MessagingServiceKey = "NSD_"..SaveDataObject.DataStoreKey
-    SaveDataObject.DataStoreService = DataStoreService
-    SaveDataObject.MessagingService = MessagingService
-    SaveDataObject:Initialize()
+    self:Initialize()
 
     --Return the object.
-    return (SaveDataObject :: any) :: SaveDataInternal
+    return self
 end
 
 --[[
 Initializes the data and connections.
 --]]
-function SaveData:Initialize(): ()
-    self.Connected = true
-    self.AutoSaveDelay = 10
-    self.MessagingServiceBufferTime = 10
-    self.AllowOverwriteOfFailedLoad = false
-    self.SendDataChangeUpdates = true
-    self.DataLoadSuccessful = false
-    self.Data = {}
-    self.PendingUpdates = {}
-    self.KeysPendingFetchUpdates = {}
-    self.OnUpdateEvents = {}
-    self.SyncId = HttpService:GenerateGUID()
-    self.LastKeyUpdateMessageTimes = {}
-    self.QueuedKeyUpdateMessages = {}
-
+function SaveData.Initialize(self: SaveData): ()
     --Connect the messaging service.
     xpcall(function()
         self.MessagingServiceListenEvent = self.MessagingService:SubscribeAsync(self.MessagingServiceKey, function(Message)
             self:HandleRemoteChange(HttpService:JSONDecode(Message.Data))
         end)
     end, function(ErrorMessage: string): ()
-        warn("Failed to subscribe to changes for "..tostring(self.MessagingServiceKey).." because "..tostring(ErrorMessage))
+        warn(`Failed to subscribe to changes for {self.MessagingServiceKey} because {ErrorMessage}`)
     end)
 
     --Get the DataStore.
-    local Worked,DataStore = pcall(function()
+    local Worked, DataStore = pcall(function()
         return self.DataStoreService:GetDataStore(self.DataStoreName)
     end)
     if not Worked then
-        error("Failed to get DataStore for "..tostring(self.DataStoreName).." because "..tostring(DataStore))
+        error(`Failed to get DataStore for {self.DataStoreName} because {DataStore}`)
         return
     end
     self.DataStore = DataStore
@@ -94,14 +94,14 @@ function SaveData:Initialize(): ()
         self.Data = DataStore:GetAsync(self.DataStoreKey) or {}
         self.DataLoadSuccessful = true
     end, function(ErrorMessage: string): ()
-        warn("Failed to get data from "..tostring(self.DataStoreName).." -> "..tostring(self.DataStoreKey).." because "..tostring(ErrorMessage))
+        warn(`Failed to get data from {self.DataStoreName} -> {self.DataStoreKey} because {ErrorMessage}`)
     end)
 end
 
 --[[
 Starts flushing the data in the background.
 --]]
-function SaveData:StartBackgroundFlushing(): ()
+function SaveData.StartBackgroundFlushing(self: SaveData): ()
     task.spawn(function()
         while self.Connected do
             task.wait(self.AutoSaveDelay)
@@ -119,7 +119,7 @@ Sets if messages are sent when a key is
 updated or if the data needs to be re-fetched (i.e. string
 or entry is >1000 characters). By default, this is true.
 --]]
-function SaveData:SetSendDataChangeUpdates(Value: boolean): ()
+function SaveData.SetSendDataChangeUpdates(self: SaveData, Value: boolean): ()
     self.SendDataChangeUpdates = Value
 end
 
@@ -128,7 +128,7 @@ Sets if data can be overwriten if the loading
 of data failed. This should be kept true if player data
 is involved. By default, this is true.
 --]]
-function SaveData:SetAllowOverwriteOfFailedLoad(Value: boolean): ()
+function SaveData.SetAllowOverwriteOfFailedLoad(self: SaveData, Value: boolean): ()
     self.AllowOverwriteOfFailedLoad = Value
 end
 
@@ -136,7 +136,7 @@ end
 Returns if the data loaded successfully. If an error
 occured (such as a DataStore failure), false is returned.
 --]]
-function SaveData:DataLoadedSuccessfully(): boolean
+function SaveData.DataLoadedSuccessfully(self: SaveData): boolean
     return self.DataLoadSuccessful
 end
 
@@ -144,7 +144,7 @@ end
 Returns if an object is below the limit of sending
 through the messaging service.
 --]]
-function SaveData:CanSendObject(Object: any): boolean
+function SaveData.CanSendObject(self: SaveData, Object: any): boolean
     --This looks weird because the limit is by data, not by message length.
     --1 JSONEncode is required to convert the message to a string, then another
     --JSONEncode is required for the BulkMessagingService. The last JSONEncode
@@ -155,7 +155,7 @@ end
 --[[
 Publishes a change to the messaging service.
 --]]
-function SaveData:PublishChange(Object: any): ()
+function SaveData.PublishChange(self: SaveData, Object: any): ()
     if self.SendDataChangeUpdates then
         self.MessagingService:PublishAsync(self.MessagingServiceKey, HttpService:JSONEncode(Object))
     end
@@ -164,7 +164,7 @@ end
 --[[
 Publishes a change to the messaging service in the background.
 --]]
-function SaveData:PublishChangeBackground(Object: any): ()
+function SaveData.PublishChangeBackground(self: SaveData, Object: any): ()
     if self.SendDataChangeUpdates then
         task.spawn(function()
             xpcall(function()
@@ -184,7 +184,7 @@ function SaveData:PublishChangeBackground(Object: any): ()
                     self:PublishChange(Object)
                 end
             end, function(ErrorMessage: string): ()
-                warn("Failed to publish change for "..tostring(self.MessagingServiceKey).." because "..tostring(ErrorMessage))
+                warn(`Failed to publish change for {self.MessagingServiceKey} because {ErrorMessage}`)
             end)
         end)
     end
@@ -194,7 +194,7 @@ end
 Internally sets a value. Invokes OnUpdate callbacks if they
 are connected.
 --]]
-function SaveData:InternalSet(Key: string, Value: any): ()
+function SaveData.InternalSet(self: SaveData, Key: string, Value: any): ()
     --Set the value.
     local ExistingValue = self.Data[Key]
     self.Data[Key] = Value
@@ -208,7 +208,7 @@ end
 --[[
 Handles remote changes being invoked by the messaging service.
 --]]
-function SaveData:HandleRemoteChange(Object: any): ()
+function SaveData.HandleRemoteChange(self: SaveData, Object: any): ()
     --Ignore remote changes if the DataStore didn't load.
     if not self.DataStore then
         return
@@ -223,7 +223,7 @@ function SaveData:HandleRemoteChange(Object: any): ()
                     self:InternalSet(Key, NewData[Key])
                 end
             end, function(ErrorMessage: string): ()
-                warn("Failed to fetch changes from "..tostring(self.DataStoreName).." -> "..tostring(self.DataStoreKey).." because "..tostring(ErrorMessage))
+                warn(`Failed to fetch changes from {self.DataStoreName} -> {self.DataStoreKey} because {ErrorMessage}`)
             end)
         elseif Object.Action == "Set" then
             --Set the value.
@@ -245,7 +245,7 @@ Flushes the data to the DataStore. If the data failed
 to initialize and SetAllowOverwriteOfFailedLoad was not set
 to true, no data will be flushed to prevent overwriting data.
 --]]
-function SaveData:Flush(): ()
+function SaveData.Flush(self: SaveData): ()
     --Return if there is no data to change.
     if #self.PendingUpdates == 0 and #self.KeysPendingFetchUpdates == 0 then
         return
@@ -253,11 +253,11 @@ function SaveData:Flush(): ()
 
     --Warn if the data can't be saved.
     if not self.DataStore then
-        warn("DataStore did not initialize correctly; unable to save data for "..tostring(self.DataStoreName).." -> "..tostring(self.DataStoreKey))
+        warn(`DataStore did not initialize correctly; unable to save data for {self.DataStoreName} -> {self.DataStoreKey}`)
         return
     end
     if not self:DataLoadedSuccessfully() and not self.AllowOverwriteOfFailedLoad then
-        warn("The data failed to load; refusing to save data for "..tostring(self.DataStoreName).." -> "..tostring(self.DataStoreKey))
+        warn(`The data failed to load; refusing to save data for {self.DataStoreName} -> {self.DataStoreKey}`)
         return
     end
 
@@ -267,7 +267,7 @@ function SaveData:Flush(): ()
             OldData = OldData or {}
 
             --Invoke the update methods.
-            for _, PendingUpdate in self.PendingUpdates :: {{Keys: {string}, UpdateFunction: (any) -> (any)}} do
+            for _, PendingUpdate in self.PendingUpdates do
                 local Keys, UpdateFunction = PendingUpdate.Keys, PendingUpdate.UpdateFunction
 
                 --Get the values of the keys.
@@ -312,14 +312,14 @@ end
 --[[
 Returns the stored value for a given key.
 --]]
-function SaveData:Get(Key: string): any
+function SaveData.Get(self: SaveData, Key: string): any
     return self.Data[Key]
 end
 
 --[[
 Sets the stored value for a given key.
 --]]
-function SaveData:Set(Key: string, Value: any): ()
+function SaveData.Set(self: SaveData, Key: string, Value: any): ()
     --Ignore the set if the value is the same.
     if Value == self:Get(Key) and typeof(Value) ~= "table" then
         return
@@ -348,7 +348,7 @@ end
 --[[
 Increments the stored value for a given key.
 --]]
-function SaveData:Increment(Key: string, Value: number): ()
+function SaveData.Increment(self: SaveData, Key: string, Value: number): ()
     self:Set(Key, (self.Data[Key] or 0) + Value)
 end
 
@@ -358,7 +358,7 @@ or keys. If multiple keys are given, the update function
 will pass the old values and expect the new values to be returned.
 This is intended for important updates that need to happen together.
 --]]
-function SaveData:Update<T...>(Keys: string | {string}, UpdateFunction: (T...) -> (T...))
+function SaveData.Update<T...>(self: SaveData, Keys: string | {string}, UpdateFunction: (T...) -> (T...))
     --Convert the key to a table.
     if type(Keys) == "string" then
         Keys = {Keys}
@@ -373,7 +373,7 @@ function SaveData:Update<T...>(Keys: string | {string}, UpdateFunction: (T...) -
     table.insert(self.PendingUpdates, {
         Keys = Keys,
         UpdateFunction = UpdateFunction,
-    })
+    } :: any)
 
     --Flush the data.
     self:Flush()
@@ -384,7 +384,7 @@ Invokes the given callback when the value for a given
 key changes. Returns the connection to disconnect the
 changes.
 --]]
-function SaveData:OnUpdate(Key: string, Callback: (any) -> ()): RBXScriptConnection
+function SaveData.OnUpdate(self: SaveData, Key: string, Callback: (any) -> ()): RBXScriptConnection
     --Create the event.
     if not self.OnUpdateEvents[Key] then
         self.OnUpdateEvents[Key] = Instance.new("BindableEvent")
@@ -397,7 +397,7 @@ end
 --[[
 Disconnects the events.
 --]]
-function SaveData:Disconnect(): ()
+function SaveData.Disconnect(self: SaveData): ()
     self.Connected = false
 
     --Disconnect the OnUpdates.

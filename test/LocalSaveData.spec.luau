@@ -63,8 +63,8 @@ return function()
             TestLocalSaveData:Set("TestKey1", 1)
             TestLocalSaveData:Set("TestKey2", 2)
             TestLocalSaveData:Set("TestKey4", 4)
-            TestLocalSaveData:Update({"TestKey1", "TestKey2", "TestKey3", "TestKey4"}, function(Value1: number, Value2: number, Value3: number, Value4: number)
-                return Value1 + 2, nil, Value2 + 2, Value4 + 2
+            TestLocalSaveData:Update({"TestKey1", "TestKey2", "TestKey3", "TestKey4"}, function(Value1: number, Value2: number?, Value3: number, Value4: number)
+                return Value1 + 2, nil, (Value2 :: number) + 2, Value4 + 2
             end)
             expect(TestLocalSaveData:Get("TestKey1")).to.equal(3)
             expect(TestLocalSaveData:Get("TestKey2")).to.equal(nil)

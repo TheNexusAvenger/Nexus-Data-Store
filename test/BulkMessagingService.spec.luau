@@ -1,8 +1,4 @@
---[[
-TheNexusAvenger
-
-Tests the BulkMessagingService class.
---]]
+--Tests the BulkMessagingService class.
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -16,7 +12,7 @@ return function()
     describe("2 bulk messaging service instances", function()
         it("should replicate data.", function()
             --Create the mock message service.
-            local MockMessagingService = ({
+            local MockMessagingService = {
                 Event = Instance.new("BindableEvent"),
                 PublishAsync = function(self,Topic,Message)
                     if string.len(Message) > 950 then error("Long message sent.") end
@@ -33,9 +29,7 @@ return function()
                         expect(HttpService:JSONEncode(Object)).to.equal(self.LastMessage)
                     end
                 end,
-            } :: any) :: MessagingService & {
-                AssertLastMessage: (self: any, Object: any) -> (),
-            }
+            } :: any
 
             --Create the 2 instances.
             local SendingBulkMessagingService = BulkMessagingService.new(MockMessagingService) :: MessagingService & {
